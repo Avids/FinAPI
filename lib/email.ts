@@ -1,3 +1,4 @@
+import nodemailer from "nodemailer";
 import { Resend } from "resend";
 
 export interface SendApiKeyEmailParams {
@@ -15,14 +16,6 @@ export async function sendApiKeyEmail({
   dailyLimit,
   isExistingUser = false,
 }: SendApiKeyEmailParams): Promise<{ success: boolean; id?: string; error?: string }> {
-  const apiKeyEnv = process.env.RESEND_API_KEY;
-  if (!apiKeyEnv) {
-    console.warn("[Email] RESEND_API_KEY is not configured; skipping email dispatch.");
-    return { success: false, error: "RESEND_API_KEY not configured" };
-  }
-
-  const resend = new Resend(apiKeyEnv);
-  const from = process.env.EMAIL_FROM || "FinAPI <onboarding@resend.dev>";
   const subject = isExistingUser
     ? "Your FinAPI Key (Recovered)"
     : "Welcome to FinAPI – Your API Key & Quick Start Guide";
@@ -114,23 +107,61 @@ Happy querying!
 FinAPI Team
   `.trim();
 
-  try {
-    const { data, error } = await resend.emails.send({
-      from,
-      to: email,
-      subject,
-      html,
-      text,
-    });
+  // 1. Prioritize Gmail SMTP if configured (no domain restrictions)
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
 
-    if (error) {
-      console.error("[Email] Failed to send API key email:", error);
-      return { success: false, error: error.message };
+  if (smtpUser && smtpPass) {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: smtpUser,
+          pass: smtpPass.replace(/\s+/g, ""), // strip any spaces in the 16-char app password
+        },
+      });
+
+      const info = await transporter.sendMail({
+        from: `"FinAPI" <${smtpUser}>`,
+        to: email,
+        subject,
+        html,
+        text,
+      });
+
+      return { success: true, id: info.messageId };
+    } catch (err: any) {
+      console.error("[Email:SMTP] Error sending email:", err);
+      // Fall through to Resend if SMTP fails
     }
-
-    return { success: true, id: data?.id };
-  } catch (err: any) {
-    console.error("[Email] Error dispatching email:", err);
-    return { success: false, error: err.message || String(err) };
   }
+
+  // 2. Fall back to Resend if configured
+  const resendApiKey = process.env.RESEND_API_KEY;
+  if (resendApiKey) {
+    try {
+      const resend = new Resend(resendApiKey);
+      const from = process.env.EMAIL_FROM || "FinAPI <onboarding@resend.dev>";
+      const { data, error } = await resend.emails.send({
+        from,
+        to: email,
+        subject,
+        html,
+        text,
+      });
+
+      if (error) {
+        console.error("[Email:Resend] Error sending email:", error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, id: data?.id };
+    } catch (err: any) {
+      console.error("[Email:Resend] Exception:", err);
+      return { success: false, error: err.message || String(err) };
+    }
+  }
+
+  console.warn("[Email] Neither SMTP_USER/PASS nor RESEND_API_KEY is configured.");
+  return { success: false, error: "No email provider configured" };
 }
