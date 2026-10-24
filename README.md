@@ -76,6 +76,17 @@ FinAPI maps over **91 curated canonical financial concepts** across four main st
 - **Share Counts:** `WeightedAverageSharesBasic`, `WeightedAverageSharesDiluted`, `SharesOutstanding` (Common Stock Shares Outstanding)
 - **Market Float:** `PublicFloat`
 
+### 5. Derived Ratios & Calculated Metrics (`metrics`)
+Rather than requiring every downstream application to manually compute fundamental metrics, FinAPI automatically calculates and aligns standardized ratios for each reported period:
+- **`FreeCashFlow`**: `OperatingCashFlow - |CapitalExpenditure|`
+- **`TotalDebt`**: Complete debt coverage including both short-term & long-term debt, and operating & finance lease liabilities
+- **`NetDebt`**: `TotalDebt - (CashAndCashEquivalents + ShortTermInvestments)`
+- **`GrossMargin`**: `GrossProfit / Revenues`
+- **`OperatingMargin`**: `OperatingIncomeLoss / Revenues`
+- **`NetMargin`**: `NetIncomeLoss / Revenues`
+- **`WorkingCapital`**: `AssetsCurrent - LiabilitiesCurrent`
+- **`CurrentRatio`**: `AssetsCurrent / LiabilitiesCurrent`
+
 ---
 
 ## How It Works (Architecture & Lifecycle)

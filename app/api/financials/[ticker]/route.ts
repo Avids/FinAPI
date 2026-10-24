@@ -5,6 +5,7 @@ import { freshness, isStale } from "@/lib/freshness";
 import { checkApiKey, json, preflight } from "@/lib/http";
 import { refreshCompany } from "@/lib/ingest";
 import { buildFinancials, type PeriodFilter } from "@/lib/normalize";
+import { buildMetrics } from "@/lib/ratios";
 import { resolveCompany } from "@/lib/service";
 
 export const runtime = "nodejs";
@@ -41,6 +42,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ ticker: string 
     }
     concepts = names.map((n) => CONCEPTS_BY_NAME.get(n.toLowerCase())!);
   }
+  const metricsParam = url.searchParams.get("metrics");
   const wait = ["1", "true"].includes(url.searchParams.get("wait") ?? "");
 
   // ── Resolve ticker ──
@@ -92,6 +94,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ ticker: string 
     concepts,
   });
 
+  const allMetrics = buildMetrics(financials);
+  const metrics = metricsParam
+    ? allMetrics.filter((m) => metricsParam.toLowerCase().split(",").includes(m.metric.toLowerCase()))
+    : allMetrics;
+
   const cacheControl = process.env.API_KEY
     ? "private, max-age=300"
     : "public, s-maxage=3600, stale-while-revalidate=86400";
@@ -114,6 +121,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ ticker: string 
         isStale: isStale(company),
         revalidating: state === "due",
       },
+      metrics,
       financials,
     },
     200,
