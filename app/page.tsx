@@ -409,42 +409,65 @@ export default function Home() {
             />
           </div>
 
-          {/* Controls Row */}
-          <div style={{ display: "grid", gridTemplateColumns: "110px 130px 100px 1fr auto", gap: 8, alignItems: "center" }}>
-            <input
-              style={inputStyle}
-              value={ticker}
-              onChange={(e) => setTicker(e.target.value.toUpperCase())}
-              placeholder="AAPL"
-            />
-            <select
-              style={inputStyle}
-              value={period}
-              onChange={(e) => setPeriod(e.target.value)}
-            >
-              <option value="annual">annual</option>
-              <option value="quarterly">quarterly</option>
-              <option value="all">all</option>
-            </select>
-            <input
-              style={inputStyle}
-              value={fromYear}
-              onChange={(e) => setFromYear(e.target.value)}
-              placeholder="From Year"
-            />
-            <input
-              style={inputStyle}
-              value={concepts}
-              onChange={(e) => setConcepts(e.target.value)}
-              placeholder="Concepts (comma-separated, blank=all)"
-            />
-            <button
-              onClick={runQuery}
-              disabled={busy}
-              style={{ ...buttonStyle, minWidth: 90 }}
-            >
-              {busy ? "Fetching…" : "Run Query"}
-            </button>
+          {/* Controls Row with Labels */}
+          <div style={{ display: "grid", gridTemplateColumns: "110px 140px 120px 1fr auto", gap: 8, alignItems: "flex-end" }}>
+            <div>
+              <label style={{ ...mono, fontSize: 11, color: "#8b949e", display: "block", marginBottom: 4 }}>TICKER</label>
+              <input
+                style={inputStyle}
+                value={ticker}
+                onChange={(e) => setTicker(e.target.value.toUpperCase())}
+                placeholder="AAPL"
+              />
+            </div>
+            <div>
+              <label style={{ ...mono, fontSize: 11, color: "#8b949e", display: "block", marginBottom: 4 }}>PERIOD</label>
+              <select
+                style={inputStyle}
+                value={period}
+                onChange={(e) => setPeriod(e.target.value)}
+              >
+                <option value="annual">annual</option>
+                <option value="quarterly">quarterly</option>
+                <option value="all">all</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ ...mono, fontSize: 11, color: "#8b949e", display: "block", marginBottom: 4 }}>
+                FROM YEAR
+              </label>
+              <input
+                style={inputStyle}
+                value={fromYear}
+                onChange={(e) => setFromYear(e.target.value)}
+                placeholder="All years"
+              />
+            </div>
+            <div>
+              <label style={{ ...mono, fontSize: 11, color: "#8b949e", display: "block", marginBottom: 4 }}>
+                CONCEPTS (BLANK = ALL 91)
+              </label>
+              <input
+                style={inputStyle}
+                value={concepts}
+                onChange={(e) => setConcepts(e.target.value)}
+                placeholder="Revenues,NetIncomeLoss..."
+              />
+            </div>
+            <div>
+              <button
+                onClick={runQuery}
+                disabled={busy}
+                style={{ ...buttonStyle, minWidth: 90, height: 35 }}
+              >
+                {busy ? "Fetching…" : "Run Query"}
+              </button>
+            </div>
+          </div>
+
+          {/* Helper Note on Parameters */}
+          <div style={{ ...mono, fontSize: 11.5, color: "#8b949e", background: "#161b22", padding: "8px 12px", borderRadius: 6, border: "1px solid #21262d", marginTop: 2, lineHeight: 1.5 }}>
+            💡 <strong>Note on "From Year":</strong> Limits results to fiscal periods ending in or after that year (e.g. <code>2020</code> returns 2020 to present). Clear the box to retrieve all historical data (15+ years).
           </div>
 
           {/* Wait checkbox */}

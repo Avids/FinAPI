@@ -179,15 +179,20 @@ x-api-key: fin_live_...
 #### Query Parameters:
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `period` | string | `all` | Filter by period type: `annual`, `quarterly`, or `all`. |
-| `concepts` | string | *(all)* | Comma-separated list of canonical concept names (e.g. `Revenues,NetIncomeLoss`). |
-| `metrics` | string | *(all)* | Comma-separated list of metrics (e.g. `FreeCashFlow,OperatingMargin,NetDebt`). |
-| `from` | number | *(none)* | Starting year (e.g. `2021` returns periods ending in 2021 or later). |
-| `wait` | boolean | `false` | When `true`, cold-start requests wait synchronously for SEC ingestion and return `200` instead of `202`. |
+| `period` | string | `all` | Filter by period type: `annual` (10-K / 20-F), `quarterly` (10-Q), or `all`. |
+| `from` | number | *(none)* | **Starting Fiscal Year Filter** (e.g. `?from=2020` returns financial data and calculated metrics from fiscal year 2020 to present). When omitted or left blank, the API returns the **full historical archive** (15+ years). |
+| `concepts` | string | *(all 91)* | Comma-separated list of canonical concept names (e.g. `Revenues,NetIncomeLoss,OperatingCashFlow`). Leave blank for all 91 concepts. |
+| `metrics` | string | *(all)* | Comma-separated list of derived financial metrics (e.g. `FreeCashFlow,OperatingMargin,NetDebt`). |
+| `wait` | boolean | `false` | When `true`, cold-start requests wait synchronously for SEC ingestion and return `200` instead of `202 Accepted`. |
+
+> **💡 Understanding the `from` Parameter:**
+> - `?from=2020`: Only returns reporting periods ending on or after `2020-01-01`. Ideal for fast, lightweight responses when analyzing recent performance.
+> - *(omitted / blank)*: Retrieves all available historical filings filed with the SEC since the company began submitting XBRL reports.
 
 #### Example Request:
 ```bash
-curl "https://finapi2026.vercel.app/api/financials/AAPL?period=annual&from=2024"
+curl -H "x-api-key: YOUR_API_KEY" \
+  "https://finapi2026.vercel.app/api/financials/AAPL?period=annual&from=2020&concepts=Revenues,NetIncomeLoss"
 ```
 
 #### Example Response:
