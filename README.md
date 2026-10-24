@@ -365,18 +365,6 @@ def get_financials(ticker: str, api_key: str):
 
 get_financials("MSFT", "fin_live_your_api_key_here")
 ```
-    
-    print(f"Company: {data['company']['name']} ({data['ticker']})")
-    print("\n--- Key Ratios & Metrics ---")
-    for m in data.get("metrics", []):
-        latest = m["periods"][-1]
-        if m["unit"] == "ratio":
-            print(f"  {m['metric']}: {latest['value'] * 100:.1f}%")
-        else:
-            print(f"  {m['metric']}: ${latest['value'] / 1e9:.2f}B")
-
-get_financials("MSFT")
-```
 
 ---
 
