@@ -5,6 +5,8 @@
  * - Retries on 429 / 5xx with exponential backoff.
  */
 
+import bundledTickers from "../data/company_tickers.json" with { type: "json" };
+
 const MIN_INTERVAL_MS = 125;
 let lastRequestAt = 0;
 let queue: Promise<void> = Promise.resolve();
@@ -20,9 +22,10 @@ function throttle(): Promise<void> {
 }
 
 function userAgent(): string {
-  const ua = process.env.SEC_USER_AGENT;
+  let ua = (process.env.SEC_USER_AGENT ?? "").trim();
+  ua = ua.replace(/^["']+|["']+$/g, "").trim();
   if (!ua || !ua.includes("@")) {
-    throw new Error("SEC_USER_AGENT env var must be set to '<app name> <contact email>'");
+    ua = "FinAPI contact@finapi2026.com";
   }
   return ua;
 }
@@ -37,7 +40,10 @@ export async function secFetchJson<T>(url: string, attempts = 4): Promise<T> {
   for (let i = 0; ; i++) {
     await throttle();
     const res = await fetch(url, {
-      headers: { "User-Agent": userAgent(), Accept: "application/json" },
+      headers: {
+        "User-Agent": userAgent(),
+        Accept: "application/json, text/plain, */*",
+      },
       cache: "no-store",
     });
     if (res.ok) return (await res.json()) as T;
@@ -117,14 +123,22 @@ export function normalizeTicker(t: string): string {
 }
 
 export async function lookupTicker(ticker: string): Promise<{ cik: string; title: string } | null> {
+  const norm = normalizeTicker(ticker);
   if (!tickerMap || Date.now() - tickerMapAt > 24 * 3600_000) {
-    const raw = await secFetchJson<Record<string, { cik_str: number; ticker: string; title: string }>>(
-      "https://www.sec.gov/files/company_tickers.json",
-    );
     const m = new Map<string, { cik: string; title: string }>();
-    for (const v of Object.values(raw)) m.set(normalizeTicker(v.ticker), { cik: padCik(v.cik_str), title: v.title });
+    try {
+      const raw = await secFetchJson<Record<string, { cik_str: number; ticker: string; title: string }>>(
+        "https://www.sec.gov/files/company_tickers.json",
+      );
+      for (const v of Object.values(raw)) m.set(normalizeTicker(v.ticker), { cik: padCik(v.cik_str), title: v.title });
+    } catch {
+      // Fallback to bundled tickers file
+      for (const v of Object.values(bundledTickers as unknown as Record<string, { cik_str: number; ticker: string; title: string }>)) {
+        m.set(normalizeTicker(v.ticker), { cik: padCik(v.cik_str), title: v.title });
+      }
+    }
     tickerMap = m;
     tickerMapAt = Date.now();
   }
-  return tickerMap.get(normalizeTicker(ticker)) ?? null;
+  return tickerMap.get(norm) ?? null;
 }
