@@ -37,6 +37,16 @@ const cf: CompanyFacts = {
           ],
         },
       },
+      OperatingLeaseLiabilityCurrent: {
+        units: {
+          USD: [{ end: "2019-03-30", val: 12000, accn: "q2", fy: 2019, fp: "Q2", form: "10-Q", filed: "2019-05-01" }],
+        },
+      },
+      RevenueRemainingPerformanceObligation: {
+        units: {
+          USD: [{ end: "2019-03-30", val: 45000, accn: "q2", fy: 2019, fp: "Q2", form: "10-Q", filed: "2019-05-01" }],
+        },
+      },
       SomeUntrackedTag: {
         units: { USD: [{ end: "2019-03-30", val: 1, accn: "q2", fy: 2019, fp: "Q2", form: "10-Q", filed: "2019-05-01" }] },
       },
@@ -59,6 +69,55 @@ describe("extractFacts", () => {
     const rows = extractFacts(cf, "2019-05-01");
     expect(rows.every((r) => r.filed >= "2019-05-01")).toBe(true);
     expect(rows.length).toBeGreaterThan(0);
+  });
+
+  it("extracts and maps IFRS taxonomy tags for foreign private issuers", () => {
+    const ifrsCf: CompanyFacts = {
+      cik: 1046179,
+      entityName: "TAIWAN SEMICONDUCTOR MANUFACTURING CO LTD",
+      facts: {
+        "ifrs-full": {
+          Revenue: {
+            units: {
+              TWD: [
+                { start: "2023-01-01", end: "2023-12-31", val: 2161735750000, accn: "tsm-2023", fy: 2023, fp: "FY", form: "20-F", filed: "2024-04-10" },
+              ],
+            },
+          },
+          ProfitLoss: {
+            units: {
+              TWD: [
+                { start: "2023-01-01", end: "2023-12-31", val: 838497645000, accn: "tsm-2023", fy: 2023, fp: "FY", form: "20-F", filed: "2024-04-10" },
+              ],
+            },
+          },
+          CurrentLeaseLiabilities: {
+            units: {
+              TWD: [
+                { end: "2023-12-31", val: 15000000000, accn: "tsm-2023", fy: 2023, fp: "FY", form: "20-F", filed: "2024-04-10" },
+              ],
+            },
+          },
+        },
+      },
+    };
+
+    const rows = extractFacts(ifrsCf);
+    expect(rows.length).toBe(3);
+
+    const fin = buildFinancials(rows, { fiscalYearEnd: "1231", period: "annual" });
+    const rev = fin.income.find((s) => s.concept === "Revenues")!;
+    expect(rev).toBeDefined();
+    expect(rev.periods[0].value).toBe(2161735750000);
+    expect(rev.unit).toBe("TWD");
+
+    const ni = fin.income.find((s) => s.concept === "NetIncomeLoss")!;
+    expect(ni).toBeDefined();
+    expect(ni.periods[0].value).toBe(838497645000);
+
+    const leases = fin.balance.find((s) => s.concept === "OperatingLeaseLiabilityCurrent")!;
+    expect(leases).toBeDefined();
+    expect(leases.periods[0].value).toBe(15000000000);
   });
 });
 
@@ -87,6 +146,10 @@ describe("buildFinancials", () => {
     expect(rev.periods.every((p) => p.type === "FY")).toBe(true);
     // FY2018 balance sheet
     expect(fin.balance.find((s) => s.concept === "Assets")!.periods).toHaveLength(1);
+    // Lease and SaaS concepts (quarterly / all)
+    const finAll = buildFinancials(rows, { fiscalYearEnd: "0928", period: "all" });
+    expect(finAll.balance.find((s) => s.concept === "OperatingLeaseLiabilityCurrent")).toBeDefined();
+    expect(finAll.balance.find((s) => s.concept === "RemainingPerformanceObligation")).toBeDefined();
   });
 
   it("quarterly view includes quarter flows and all balance-sheet dates", () => {
