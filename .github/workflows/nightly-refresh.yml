@@ -1,0 +1,28 @@
+name: Nightly SEC refresh
+
+on:
+  schedule:
+    - cron: "0 3 * * *" # 03:00 UTC
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "How many top-requested tickers to consider"
+        default: "50"
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Call /api/cron/refresh
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          LIMIT: ${{ github.event.inputs.limit || '50' }}
+        run: |
+          set -euo pipefail
+          curl --fail-with-body -sS --max-time 320 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${API_BASE_URL%/}/api/cron/refresh?limit=${LIMIT}" | tee result.json
+          echo
+          jq '.summary' result.json || true
