@@ -1,6 +1,6 @@
 export const metadata = {
-  title: "SECAPI — SEC EDGAR financials",
-  description: "Cached SEC EDGAR financial data by ticker",
+  title: "FinAPI — Standardized SEC EDGAR Financials & Fundamental Metrics",
+  description: "High-performance cached SEC EDGAR financial statement data, 91 standardized concepts, and computed financial ratios for 10,000+ public companies.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

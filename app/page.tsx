@@ -187,37 +187,78 @@ export default function Home() {
     marginTop: 24,
   };
 
+  const featureChipStyle: React.CSSProperties = {
+    background: "#161b22",
+    border: "1px solid #30363d",
+    borderRadius: 8,
+    padding: "16px 18px",
+  };
+
   return (
     <main style={{ maxWidth: 960, margin: "0 auto", padding: "48px 20px 80px" }}>
-      {/* Header */}
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <h1 style={{ margin: 0, fontSize: 30, fontWeight: 700, letterSpacing: -0.5 }}>SECAPI</h1>
-            <span style={{ ...mono, background: "#1f6feb22", color: "#58a6ff", border: "1px solid #1f6feb55", padding: "2px 8px", borderRadius: 12, fontSize: 12 }}>
-              v1.0 • 20 calls/day Free
-            </span>
+      {/* Header & Hero */}
+      <header style={{ borderBottom: "1px solid #21262d", paddingBottom: 28 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <h1 style={{ margin: 0, fontSize: 34, fontWeight: 800, letterSpacing: -0.5, color: "#ffffff" }}>FinAPI</h1>
+              <span style={{ ...mono, background: "#1f6feb22", color: "#58a6ff", border: "1px solid #1f6feb55", padding: "3px 10px", borderRadius: 14, fontSize: 12, fontWeight: 600 }}>
+                v1.0 • 20 calls/day Free
+              </span>
+            </div>
+            <p style={{ color: "#388bfd", fontSize: 17, fontWeight: 500, margin: "8px 0 0" }}>
+              High-Performance SEC EDGAR Financial Data & Fundamental Ratios API
+            </p>
+            <p style={{ color: "#8b949e", marginTop: 8, fontSize: 14.5, lineHeight: 1.6, maxWidth: 760 }}>
+              FinAPI bridges the gap between raw, multi-megabyte SEC EDGAR filings and modern applications. We ingest company facts once, standardize 91 accounting concepts across US-GAAP and IFRS, compute fundamental ratios on the fly, and deliver clean JSON in milliseconds.
+            </p>
           </div>
-          <p style={{ color: "#8b949e", marginTop: 8, fontSize: 15, maxWidth: 650 }}>
-            Standardized financial data directly from SEC EDGAR company filings, cached in Turso SQLite. Includes 91 US-GAAP and IFRS concepts, balance sheets, and computed financial ratios.
-          </p>
+          <div style={{ display: "flex", gap: 10 }}>
+            <a
+              href="/admin"
+              style={{
+                ...mono,
+                background: "#21262d",
+                color: "#c9d1d9",
+                padding: "8px 14px",
+                borderRadius: 6,
+                textDecoration: "none",
+                border: "1px solid #30363d",
+                fontSize: 12,
+                display: "inline-block",
+              }}
+            >
+              Admin Dashboard →
+            </a>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <a
-            href="/admin"
-            style={{
-              ...mono,
-              background: "#21262d",
-              color: "#c9d1d9",
-              padding: "7px 12px",
-              borderRadius: 6,
-              textDecoration: "none",
-              border: "1px solid #30363d",
-              fontSize: 12,
-            }}
-          >
-            Admin Dashboard →
-          </a>
+
+        {/* Feature Highlights Grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12, marginTop: 24 }}>
+          <div style={featureChipStyle}>
+            <div style={{ fontSize: 18, marginBottom: 6 }}>⚡ <strong>Sub-Second Speed</strong></div>
+            <p style={{ margin: 0, fontSize: 12.5, color: "#8b949e", lineHeight: 1.5 }}>
+              Raw SEC filings are decomposed into Turso SQLite. Warm requests serve filtered slices in under 400ms.
+            </p>
+          </div>
+          <div style={featureChipStyle}>
+            <div style={{ fontSize: 18, marginBottom: 6 }}>🌐 <strong>10,000+ Tickers</strong></div>
+            <p style={{ margin: 0, fontSize: 12.5, color: "#8b949e", lineHeight: 1.5 }}>
+              All US public equities (AAPL, NVDA, MSFT) plus ADRs and foreign issuers (TSM, BABA, ASML) via IFRS-full mapping.
+            </p>
+          </div>
+          <div style={featureChipStyle}>
+            <div style={{ fontSize: 18, marginBottom: 6 }}>📊 <strong>91 Concepts</strong></div>
+            <p style={{ margin: 0, fontSize: 12.5, color: "#8b949e", lineHeight: 1.5 }}>
+              Income, balance sheet, cash flows, and per-share items normalized across historical taxonomy revisions.
+            </p>
+          </div>
+          <div style={featureChipStyle}>
+            <div style={{ fontSize: 18, marginBottom: 6 }}>🧮 <strong>Server-Side Ratios</strong></div>
+            <p style={{ margin: 0, fontSize: 12.5, color: "#8b949e", lineHeight: 1.5 }}>
+              Auto-computes Free Cash Flow, Operating & Net Margins, Net Debt, Working Capital, and Current Ratios.
+            </p>
+          </div>
         </div>
       </header>
 
@@ -226,12 +267,12 @@ export default function Home() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>
-              {user ? "Your API Account" : "Get Your Free API Key"}
+              {user ? "Your FinAPI Account" : "Get Your Free API Key"}
             </h2>
             <p style={{ margin: "4px 0 0", color: "#8b949e", fontSize: 13 }}>
               {user 
-                ? "Active credentials for calling SECAPI. Rate limit resets daily at 00:00 UTC."
-                : "Register with your name and email to receive an instant API key with 20 free requests/day."}
+                ? "Active credentials for calling FinAPI. Rate limit resets daily at 00:00 UTC."
+                : "Register with your name and email to receive an instant API key with 20 free requests/day (also sent to your inbox)."}
             </p>
           </div>
           {user && (
@@ -494,7 +535,7 @@ export default function Home() {
               <code style={{ ...mono, fontSize: 13, color: "#e6edf3" }}>/api/auth/register</code>
             </div>
             <p style={{ margin: "6px 0 0", color: "#8b949e", fontSize: 13 }}>
-              Public endpoint. Registers a user with <code>name</code> and <code>email</code> to generate a free API key with 20 requests/day.
+              Public endpoint. Registers a user with <code>name</code> and <code>email</code> to generate a free API key with 20 requests/day, dispatched automatically to their email.
             </p>
           </div>
 
@@ -523,7 +564,7 @@ export default function Home() {
       {/* Footer */}
       <footer style={{ marginTop: 60, paddingTop: 20, borderTop: "1px solid #21262d", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#8b949e", fontSize: 13 }}>
         <div>
-          SECAPI • Direct SEC EDGAR Data Service
+          FinAPI • High-Performance SEC EDGAR Financial Data Service
         </div>
         <div style={{ display: "flex", gap: 16 }}>
           <a href="https://github.com/Avids/FinAPI" target="_blank" rel="noopener noreferrer" style={{ color: "#58a6ff", textDecoration: "none" }}>
