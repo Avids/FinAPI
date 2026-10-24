@@ -37,13 +37,13 @@ FinAPI supports **any US publicly traded company or foreign company filing with 
 
 ## What Information Is Provided?
 
-FinAPI maps over **80 curated canonical financial concepts** across four main statement groups:
+FinAPI maps over **91 curated canonical financial concepts** across four main statement groups, with unified fallbacks across both **US-GAAP** and **IFRS** (`ifrs-full`) taxonomies:
 
 ### 1. Income Statement (`income`)
-- **Revenues:** `Revenues`, `SalesRevenueNet`, `RevenueFromContractWithCustomer` (merged across accounting changes)
+- **Revenues:** `Revenues`, `SalesRevenueNet`, `RevenueFromContractWithCustomer`, `ifrs-full:Revenue` (merged across accounting changes)
 - **Cost of Revenue & Profit:** `CostOfRevenue`, `GrossProfit`
 - **Operating Expenses:** `ResearchAndDevelopmentExpense`, `SellingGeneralAndAdministrativeExpense`, `SellingAndMarketingExpense`, `GeneralAndAdministrativeExpense`, `OperatingExpenses`
-- **Operating & Pre-Tax Income:** `OperatingIncomeLoss`, `NonoperatingIncomeExpense`, `InterestExpense`, `IncomeBeforeIncomeTaxes`, `IncomeTaxExpense`
+- **Operating & Pre-Tax Income:** `OperatingIncomeLoss`, `NonoperatingIncomeExpense`, `InterestExpense`, `InterestIncome`, `IncomeBeforeIncomeTaxes`, `IncomeTaxExpense`
 - **Bottom Line:** `NetIncomeLoss`, `NetIncomeAvailableToCommonStockholders`, `NetIncomeAttributableToNoncontrollingInterest`, `ComprehensiveIncome`
 - **Financial Institutions / Banks:** `InterestAndDividendIncome`, `NetInterestIncome`, `NoninterestIncome`, `NoninterestExpense`, `ProvisionForCreditLosses`
 
@@ -51,9 +51,18 @@ FinAPI maps over **80 curated canonical financial concepts** across four main st
 - **Current Assets:** `CashAndCashEquivalents`, `ShortTermInvestments`, `AccountsReceivable`, `Inventory`, `OtherCurrentAssets`, `AssetsCurrent`
 - **Non-Current Assets:** `PropertyPlantAndEquipmentNet`, `OperatingLeaseRightOfUseAsset`, `Goodwill`, `IntangibleAssetsNet`, `LongTermInvestments`, `OtherNoncurrentAssets`, `Assets` (Total Assets)
 - **Current Liabilities:** `AccountsPayable`, `AccruedLiabilities`, `DeferredRevenueCurrent`, `ShortTermDebt`, `LongTermDebtCurrent`, `LiabilitiesCurrent`
-- **Non-Current Liabilities:** `LongTermDebt`, `OperatingLeaseLiabilityNoncurrent`, `OtherNoncurrentLiabilities`, `Liabilities` (Total Liabilities)
-- **Equity:** `CommonStockAndAdditionalPaidInCapital`, `RetainedEarnings`, `AccumulatedOtherComprehensiveIncome`, `TreasuryStock`, `StockholdersEquity`, `LiabilitiesAndStockholdersEquity`
-- **Financial Institutions / Banks:** `Deposits`, `LoansAndLeasesReceivableNet`
+- **Lease Liabilities (Full Debt Coverage):**
+  - `OperatingLeaseLiabilityCurrent` (`us-gaap:OperatingLeaseLiabilityCurrent`, `ifrs-full:CurrentLeaseLiabilities`)
+  - `OperatingLeaseLiabilityNoncurrent` (`us-gaap:OperatingLeaseLiabilityNoncurrent`, `ifrs-full:NoncurrentLeaseLiabilities`)
+  - `FinanceLeaseLiabilityCurrent` & `FinanceLeaseLiabilityNoncurrent`
+- **Non-Current Liabilities:** `LongTermDebt`, `OtherNoncurrentLiabilities`, `Liabilities` (Total Liabilities)
+- **Capital Structure & Equity:**
+  - `PreferredStock` (`us-gaap:PreferredStockValue`, `ifrs-full:PreferenceShares`)
+  - `CommonStockAndAdditionalPaidInCapital`, `RetainedEarnings`, `AccumulatedOtherComprehensiveIncome`, `TreasuryStock`
+  - `MinorityInterest` (`us-gaap:MinorityInterest`, `ifrs-full:NoncontrollingInterests`)
+  - `StockholdersEquity`, `LiabilitiesAndStockholdersEquity`
+- **SaaS / Cloud Metrics:** `DeferredRevenueNoncurrent`, `RemainingPerformanceObligation` (RPO / Backlog)
+- **Financial Institutions / Banks:** `Deposits`, `LoansAndLeasesReceivableNet`, `AllowanceForCreditLosses`
 
 ### 3. Cash Flow Statement (`cashflow`)
 - **Operating Activities:** `OperatingCashFlow`, `DepreciationAndAmortization`, `ShareBasedCompensation`, `DeferredIncomeTaxes`, changes in working capital (`ChangeInAccountsReceivable`, `ChangeInInventories`, `ChangeInAccountsPayable`)
