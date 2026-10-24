@@ -84,8 +84,8 @@ export default function Home() {
       localStorage.setItem("finapi_user_key", data.user.apiKey);
       setRegMsg({
         text: data.status === "created" 
-          ? "🎉 API Key generated! 20 free requests/day granted." 
-          : "👋 Welcome back! Recovered your existing API key.",
+          ? "🎉 API Key generated and sent to your email! 20 free requests/day granted." 
+          : "👋 Welcome back! Recovered your existing API key (also sent to your email).",
         type: "success",
       });
     } catch (err: any) {
