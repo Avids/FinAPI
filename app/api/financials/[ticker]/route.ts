@@ -1,8 +1,9 @@
 import { after } from "next/server";
+import { authenticateAndRateLimit } from "@/lib/auth";
 import { CONCEPTS, CONCEPTS_BY_NAME, type ConceptDef } from "@/lib/concepts";
 import { getCompanyByCik, getFacts, incrementRequestCount, type CompanyRow } from "@/lib/db";
 import { freshness, isStale } from "@/lib/freshness";
-import { checkApiKey, json, preflight } from "@/lib/http";
+import { json, preflight } from "@/lib/http";
 import { refreshCompany } from "@/lib/ingest";
 import { buildFinancials, type PeriodFilter } from "@/lib/normalize";
 import { buildMetrics } from "@/lib/ratios";
@@ -17,20 +18,23 @@ export function OPTIONS() {
 }
 
 export async function GET(req: Request, ctx: { params: Promise<{ ticker: string }> }) {
-  const denied = checkApiKey(req);
-  if (denied) return denied;
-
   const url = new URL(req.url);
   const { ticker: rawTicker } = await ctx.params;
+
+  // ── Authentication & Daily Rate Limiting ──
+  const auth = await authenticateAndRateLimit(req, rawTicker);
+  if (!auth.ok) return auth.response;
 
   // ── Parse query params ──
   const periodParam = (url.searchParams.get("period") ?? "all").toLowerCase();
   if (!["annual", "quarterly", "all"].includes(periodParam)) {
-    return json({ error: "bad_request", message: "period must be annual | quarterly | all" }, 400);
+    return json({ error: "bad_request", message: "period must be annual | quarterly | all" }, 400, auth.headers);
   }
   const fromParam = url.searchParams.get("from");
   const fromYear = fromParam ? Number(fromParam) : undefined;
-  if (fromParam && !Number.isInteger(fromYear)) return json({ error: "bad_request", message: "from must be a year" }, 400);
+  if (fromParam && !Number.isInteger(fromYear)) {
+    return json({ error: "bad_request", message: "from must be a year" }, 400, auth.headers);
+  }
 
   let concepts: ConceptDef[] = CONCEPTS;
   const conceptsParam = url.searchParams.get("concepts");
@@ -38,7 +42,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ ticker: string 
     const names = conceptsParam.split(",").map((s) => s.trim()).filter(Boolean);
     const unknown = names.filter((n) => !CONCEPTS_BY_NAME.has(n.toLowerCase()));
     if (unknown.length) {
-      return json({ error: "bad_request", message: `unknown concepts: ${unknown.join(", ")}`, see: "/api/concepts" }, 400);
+      return json({ error: "bad_request", message: `unknown concepts: ${unknown.join(", ")}`, see: "/api/concepts" }, 400, auth.headers);
     }
     concepts = names.map((n) => CONCEPTS_BY_NAME.get(n.toLowerCase())!);
   }
@@ -47,7 +51,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ ticker: string 
 
   // ── Resolve ticker ──
   const resolved = await resolveCompany(rawTicker);
-  if (!resolved.ok) return json({ error: resolved.status === 404 ? "not_found" : "bad_request", message: resolved.error }, resolved.status);
+  if (!resolved.ok) {
+    return json({ error: resolved.status === 404 ? "not_found" : "bad_request", message: resolved.error }, resolved.status, auth.headers);
+  }
   let company: CompanyRow = resolved.company;
   const cik = company.cik;
 
@@ -64,10 +70,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ ticker: string 
           ticker: resolved.ticker,
           cik,
           message: "First request for this ticker: loading from SEC EDGAR. Retry in a few seconds (or pass ?wait=true).",
+          rateLimit: { limit: auth.limit, remaining: auth.remaining },
           ...(company.last_error ? { lastError: company.last_error } : {}),
         },
         202,
-        { "Retry-After": "5", "Cache-Control": "no-store" },
+        { "Retry-After": "5", "Cache-Control": "no-store", ...auth.headers },
       );
     }
     const r = await refreshCompany(cik);
@@ -75,9 +82,16 @@ export async function GET(req: Request, ctx: { params: Promise<{ ticker: string 
     else company = (await getCompanyByCik(cik)) ?? company;
     if (!company.refreshed_at) {
       return json(
-        { status: "pending", ticker: resolved.ticker, cik, message: "Still loading, retry shortly.", ...(r.status === "error" ? { lastError: r.error } : {}) },
+        {
+          status: "pending",
+          ticker: resolved.ticker,
+          cik,
+          message: "Still loading, retry shortly.",
+          rateLimit: { limit: auth.limit, remaining: auth.remaining },
+          ...(r.status === "error" ? { lastError: r.error } : {}),
+        },
         r.status === "error" ? 502 : 202,
-        { "Retry-After": "5", "Cache-Control": "no-store" },
+        { "Retry-After": "5", "Cache-Control": "no-store", ...auth.headers },
       );
     }
   } else if (state === "due") {
@@ -99,9 +113,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ ticker: string 
     ? allMetrics.filter((m) => metricsParam.toLowerCase().split(",").includes(m.metric.toLowerCase()))
     : allMetrics;
 
-  const cacheControl = process.env.API_KEY
-    ? "private, max-age=300"
-    : "public, s-maxage=3600, stale-while-revalidate=86400";
+  const cacheControl = "private, no-cache";
 
   return json(
     {
@@ -121,11 +133,15 @@ export async function GET(req: Request, ctx: { params: Promise<{ ticker: string 
         isStale: isStale(company),
         revalidating: state === "due",
       },
+      rateLimit: {
+        dailyLimit: auth.limit,
+        remainingToday: auth.remaining,
+      },
       metrics,
       financials,
     },
     200,
-    { "Cache-Control": cacheControl },
+    { "Cache-Control": cacheControl, ...auth.headers },
   );
 }
 

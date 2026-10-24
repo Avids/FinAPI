@@ -37,4 +37,24 @@ export const SCHEMA_STATEMENTS: string[] = [
     ticker TEXT PRIMARY KEY,
     cik    TEXT NOT NULL
   )`,
+  // User registration & API key management
+  `CREATE TABLE IF NOT EXISTS users (
+    id             TEXT PRIMARY KEY,
+    name           TEXT NOT NULL,
+    email          TEXT UNIQUE NOT NULL,
+    api_key        TEXT UNIQUE NOT NULL,
+    tier           TEXT NOT NULL DEFAULT 'free',
+    daily_limit    INTEGER NOT NULL DEFAULT 20,
+    total_requests INTEGER NOT NULL DEFAULT 0,
+    last_ticker    TEXT,
+    last_used_at   TEXT,
+    created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  )`,
+  // Daily request usage tracking for rate limiting
+  `CREATE TABLE IF NOT EXISTS api_usage (
+    api_key TEXT NOT NULL,
+    day     TEXT NOT NULL,
+    count   INTEGER NOT NULL DEFAULT 1,
+    PRIMARY KEY (api_key, day)
+  ) WITHOUT ROWID`,
 ];

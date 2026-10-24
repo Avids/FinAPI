@@ -128,11 +128,52 @@ Your App  ───►  GET /api/financials/AAPL  ───►  FinAPI (Vercel)
 
 ---
 
+## Authentication & Rate Limiting
+
+FinAPI includes built-in user registration, API key authentication, and daily quota management.
+
+### Free Tier Limits
+- **Daily Quota:** **20 requests per day** per registered user.
+- **Quota Reset:** Daily at **00:00 UTC**.
+- **Rate Limit Headers:** Every response includes standard rate-limit headers:
+  - `X-RateLimit-Limit`: Maximum allowed requests per day (e.g. `20`)
+  - `X-RateLimit-Remaining`: Remaining calls for the current UTC day
+  - `X-RateLimit-Reset`: Unix timestamp when quota resets
+- **HTTP 429:** Exceeding the daily quota returns `429 Too Many Requests` with a `Retry-After` header.
+
+### Authenticating Requests
+Pass your API key using either:
+1. HTTP Header: `x-api-key: fin_live_...` (Recommended)
+2. Query Parameter: `?api_key=fin_live_...`
+3. Bearer Token: `Authorization: Bearer fin_live_...`
+
+---
+
 ## API Reference
 
-### 1. Get Financial Data & Metrics for a Ticker
+### 1. Register for a Free API Key
+```http
+POST /api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Jane Doe",
+  "email": "jane@example.com"
+}
+```
+Generates and returns an instant API key (`fin_live_...`) with 20 requests/day. If the email is already registered, it recovers and returns the existing key and current usage status.
+
+### 2. Check User Usage & Quota
+```http
+GET /api/auth/me
+x-api-key: fin_live_...
+```
+Returns user profile, requests used today, remaining calls, lifetime requests, and reset timestamp.
+
+### 3. Get Financial Data & Metrics for a Ticker
 ```http
 GET /api/financials/{ticker}
+x-api-key: fin_live_...
 ```
 
 #### Query Parameters:
@@ -242,7 +283,13 @@ GET /api/health
 ```
 Returns database connectivity status, total companies cached, total historical fact rows in Turso, and a breakdown per company.
 
-### 4. Background Refresh Trigger (Cron)
+### 4. Admin Management Dashboard
+The admin UI is available at `/admin` and is protected by your master secret (`CRON_SECRET` or `ADMIN_SECRET`).
+- View total registered users, active users today, total daily & lifetime API calls.
+- Inspect every user's email, name, generated API key, daily limit, usage progress, and last-called ticker.
+- Dynamically increase or decrease any user's daily limit (e.g. upgrade from 20 to 500 requests/day).
+
+### 5. Background Refresh Trigger (Cron)
 ```http
 POST /api/cron/refresh?limit=50
 Authorization: Bearer <CRON_SECRET>
@@ -255,13 +302,23 @@ Scans the top-N most requested stocks and refreshes any ticker exceeding the 60-
 
 ### JavaScript / TypeScript
 ```typescript
-async function getStockMetrics(ticker: string) {
-  const res = await fetch(`https://finapi2026.vercel.app/api/financials/${ticker}?period=annual&from=2023&wait=true`);
+async function getStockMetrics(ticker: string, apiKey: string) {
+  const res = await fetch(
+    `https://finapi2026.vercel.app/api/financials/${ticker}?period=annual&from=2023&wait=true`,
+    {
+      headers: {
+        "x-api-key": apiKey,
+      },
+    }
+  );
   
   if (res.status === 202) {
     console.log("Ingesting from SEC EDGAR, try again in 5 seconds.");
     return null;
   }
+  
+  // Rate limit information from headers
+  console.log("Quota Remaining:", res.headers.get("x-ratelimit-remaining"));
   
   const data = await res.json();
   console.log(`=== ${data.company.name} (${data.ticker}) ===`);
@@ -276,22 +333,38 @@ async function getStockMetrics(ticker: string) {
   });
 }
 
-getStockMetrics("AAPL");
+getStockMetrics("AAPL", "fin_live_your_api_key_here");
 ```
 
 ### Python
 ```python
 import requests
 
-def get_financials(ticker: str):
+def get_financials(ticker: str, api_key: str):
     url = f"https://finapi2026.vercel.app/api/financials/{ticker}"
+    headers = {
+        "x-api-key": api_key
+    }
     params = {
         "period": "annual",
         "from": 2023,
         "wait": "true"
     }
-    response = requests.get(url, params=params)
+    response = requests.get(url, headers=headers, params=params)
+    print("Quota Remaining:", response.headers.get("x-ratelimit-remaining"))
+    
     data = response.json()
+    print(f"Company: {data['company']['name']} ({data['ticker']})")
+    print("\n--- Key Ratios & Metrics ---")
+    for m in data.get("metrics", []):
+        latest = m["periods"][-1]
+        if m["unit"] == "ratio":
+            print(f"  {m['metric']}: {latest['value'] * 100:.1f}%")
+        else:
+            print(f"  {m['metric']}: ${latest['value'] / 1e9:.2f}B")
+
+get_financials("MSFT", "fin_live_your_api_key_here")
+```
     
     print(f"Company: {data['company']['name']} ({data['ticker']})")
     print("\n--- Key Ratios & Metrics ---")
