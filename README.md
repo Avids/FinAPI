@@ -1,11 +1,12 @@
 # FinAPI 📈
 
-A high-performance caching proxy in front of **SEC EDGAR**. FinAPI allows any application to request clean, structured financial data (revenue, net income, balance sheet, cash flows, per-share metrics) for **any US public company** with millisecond response times.
+A high-performance caching proxy in front of **SEC EDGAR**. FinAPI allows any application to request clean, structured financial data (revenue, net income, balance sheet, cash flows, per-share metrics, and server-side calculated ratios) for **any US public company** with millisecond response times.
 
 - **Live Production API:** [https://finapi2026.vercel.app](https://finapi2026.vercel.app)
 - **Hosted on:** Vercel (Next.js 16 Fluid Compute)
 - **Database / Smart Cache:** Turso (libSQL / SQLite)
 - **Source of Truth:** SEC EDGAR Financial Statement Data Sets (`companyfacts` & `submissions`)
+- **Taxonomies Supported:** US-GAAP & IFRS (`ifrs-full`)
 - **Automated Warmup:** GitHub Actions cron job
 
 ---
@@ -18,9 +19,9 @@ Accessing financial data directly from the SEC EDGAR API in web or mobile applic
 2. **Platform Limits:** Serverless environments like Vercel have strict 4.5 MB response payload limits. Handing raw SEC files directly to client apps is impossible for large filers.
 3. **No CORS Support:** `data.sec.gov` does not send `Access-Control-Allow-Origin` headers, preventing client-side browser applications from calling it directly.
 4. **Strict Rate Limits & Headers:** SEC requires a specific `User-Agent` format (including admin contact email) and enforces a strict limit of 10 requests/second per IP, returning `403 Forbidden` if violated.
-5. **Taxonomy & Accounting Changes:** Companies switch XBRL tags over time (e.g. switching from `SalesRevenueNet` to `RevenueFromContractWithCustomerExcludingAssessedTax` after ASC 606).
+5. **Taxonomy & Accounting Changes:** Companies switch XBRL tags over time (e.g. switching from `SalesRevenueNet` to `RevenueFromContractWithCustomerExcludingAssessedTax` after ASC 606), and foreign private issuers file under `ifrs-full` instead of `us-gaap`.
 
-**FinAPI sits in the middle:** it fetches the 7 MB raw file once, decomposes and standardizes the facts into Turso SQLite, and serves tailored, filtered slices in **under 400 milliseconds**.
+**FinAPI sits in the middle:** it fetches the 7 MB raw file once, decomposes and standardizes the facts into Turso SQLite, and serves tailored, filtered slices with calculated ratios in **under 400 milliseconds**.
 
 ---
 
@@ -29,6 +30,7 @@ Accessing financial data directly from the SEC EDGAR API in web or mobile applic
 FinAPI supports **any US publicly traded company or foreign company filing with the SEC**:
 
 - **Coverage:** **10,000+ public tickers** across NYSE, NASDAQ, CBOE, and OTC markets.
+- **Foreign Issuers (IFRS):** Full native support for foreign private issuers filing forms `20-F` and `40-F` under `ifrs-full` (e.g. `TSM`, `BABA`, `ASML`, `NVO`, `SAP`, `AZN`, `SHEL`).
 - **Eligible Filers:** Any company that files periodic financial reports (`10-K`, `10-Q`, `20-F`, `40-F`) with XBRL disclosures.
 - **Ticker Mapping:** Automatically resolves ticker symbols to official 10-digit SEC CIK numbers.
 - **Dual-Class & Symbols:** Automatically normalizes dot and dash tickers (e.g. `BRK.B` / `BRK-B`, `GOOG` / `GOOGL`).
@@ -37,7 +39,7 @@ FinAPI supports **any US publicly traded company or foreign company filing with 
 
 ## What Information Is Provided?
 
-FinAPI maps over **91 curated canonical financial concepts** across four main statement groups, with unified fallbacks across both **US-GAAP** and **IFRS** (`ifrs-full`) taxonomies:
+FinAPI maps over **91 curated canonical financial concepts** across four main statement groups, plus a server-side **`metrics`** engine:
 
 ### 1. Income Statement (`income`)
 - **Revenues:** `Revenues`, `SalesRevenueNet`, `RevenueFromContractWithCustomer`, `ifrs-full:Revenue` (merged across accounting changes)
@@ -77,15 +79,18 @@ FinAPI maps over **91 curated canonical financial concepts** across four main st
 - **Market Float:** `PublicFloat`
 
 ### 5. Derived Ratios & Calculated Metrics (`metrics`)
-Rather than requiring every downstream application to manually compute fundamental metrics, FinAPI automatically calculates and aligns standardized ratios for each reported period:
-- **`FreeCashFlow`**: `OperatingCashFlow - |CapitalExpenditure|`
-- **`TotalDebt`**: Complete debt coverage including both short-term & long-term debt, and operating & finance lease liabilities
-- **`NetDebt`**: `TotalDebt - (CashAndCashEquivalents + ShortTermInvestments)`
-- **`GrossMargin`**: `GrossProfit / Revenues`
-- **`OperatingMargin`**: `OperatingIncomeLoss / Revenues`
-- **`NetMargin`**: `NetIncomeLoss / Revenues`
-- **`WorkingCapital`**: `AssetsCurrent - LiabilitiesCurrent`
-- **`CurrentRatio`**: `AssetsCurrent / LiabilitiesCurrent`
+Rather than requiring every downstream application to manually compute fundamental metrics, FinAPI automatically aligns and calculates standardized ratios for each reported period:
+
+| Metric | Formula | Unit | Description |
+|---|---|---|---|
+| **`FreeCashFlow`** | `OperatingCashFlow - \|CapEx\|` | Currency | Cash generated after capital investments |
+| **`GrossMargin`** | `GrossProfit / Revenues` | `ratio` | Efficiency at producing goods and services |
+| **`OperatingMargin`** | `OperatingIncomeLoss / Revenues` | `ratio` | Profitability from core operations |
+| **`NetMargin`** | `NetIncomeLoss / Revenues` | `ratio` | Bottom-line profit percentage |
+| **`TotalDebt`** | `ST Debt + LT Debt + Lease Liabilities` | Currency | Comprehensive debt including current & non-current lease liabilities |
+| **`NetDebt`** | `TotalDebt - (Cash + ST Investments)` | Currency | Debt net of liquid cash and marketable securities |
+| **`WorkingCapital`** | `AssetsCurrent - LiabilitiesCurrent` | Currency | Short-term liquidity buffer |
+| **`CurrentRatio`** | `AssetsCurrent / LiabilitiesCurrent` | `ratio` | Ability to cover short-term obligations |
 
 ---
 
@@ -125,7 +130,7 @@ Your App  ───►  GET /api/financials/AAPL  ───►  FinAPI (Vercel)
 
 ## API Reference
 
-### 1. Get Financial Data for a Ticker
+### 1. Get Financial Data & Metrics for a Ticker
 ```http
 GET /api/financials/{ticker}
 ```
@@ -135,12 +140,13 @@ GET /api/financials/{ticker}
 |---|---|---|---|
 | `period` | string | `all` | Filter by period type: `annual`, `quarterly`, or `all`. |
 | `concepts` | string | *(all)* | Comma-separated list of canonical concept names (e.g. `Revenues,NetIncomeLoss`). |
-| `from` | number | *(none)* | Starting year (e.g. `2021` will return periods ending in 2021 or later). |
+| `metrics` | string | *(all)* | Comma-separated list of metrics (e.g. `FreeCashFlow,OperatingMargin,NetDebt`). |
+| `from` | number | *(none)* | Starting year (e.g. `2021` returns periods ending in 2021 or later). |
 | `wait` | boolean | `false` | When `true`, cold-start requests wait synchronously for SEC ingestion and return `200` instead of `202`. |
 
 #### Example Request:
 ```bash
-curl "https://finapi2026.vercel.app/api/financials/AAPL?period=annual&concepts=Revenues,NetIncomeLoss&from=2021"
+curl "https://finapi2026.vercel.app/api/financials/AAPL?period=annual&from=2024"
 ```
 
 #### Example Response:
@@ -162,6 +168,40 @@ curl "https://finapi2026.vercel.app/api/financials/AAPL?period=annual&concepts=R
     "isStale": false,
     "revalidating": false
   },
+  "metrics": [
+    {
+      "metric": "FreeCashFlow",
+      "unit": "USD",
+      "periods": [
+        { "type": "FY", "start": "2023-10-01", "end": "2024-09-28", "value": 108807000000 },
+        { "type": "FY", "start": "2024-09-29", "end": "2025-09-27", "value": 98767000000 }
+      ]
+    },
+    {
+      "metric": "OperatingMargin",
+      "unit": "ratio",
+      "periods": [
+        { "type": "FY", "start": "2023-10-01", "end": "2024-09-28", "value": 0.3151 },
+        { "type": "FY", "start": "2024-09-29", "end": "2025-09-27", "value": 0.3197 }
+      ]
+    },
+    {
+      "metric": "TotalDebt",
+      "unit": "USD",
+      "periods": [
+        { "type": "FY", "end": "2024-09-28", "value": 116676000000 },
+        { "type": "FY", "end": "2025-09-27", "value": 109570000000 }
+      ]
+    },
+    {
+      "metric": "NetDebt",
+      "unit": "USD",
+      "periods": [
+        { "type": "FY", "end": "2024-09-28", "value": 51500000000 },
+        { "type": "FY", "end": "2025-09-27", "value": 54870000000 }
+      ]
+    }
+  ],
   "financials": {
     "income": [
       {
@@ -170,21 +210,9 @@ curl "https://finapi2026.vercel.app/api/financials/AAPL?period=annual&concepts=R
         "periods": [
           {
             "type": "FY",
-            "start": "2020-09-27",
-            "end": "2021-09-25",
-            "value": 365817000000,
-            "fy": 2023,
-            "fp": "FY",
-            "form": "10-K",
-            "filed": "2023-11-03",
-            "accn": "0000320193-23-000106",
-            "tag": "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax"
-          },
-          {
-            "type": "FY",
-            "start": "2024-09-29",
-            "end": "2025-09-27",
-            "value": 416161000000,
+            "start": "2023-10-01",
+            "end": "2024-09-28",
+            "value": 391035000000,
             "fy": 2025,
             "fp": "FY",
             "form": "10-K",
@@ -195,9 +223,9 @@ curl "https://finapi2026.vercel.app/api/financials/AAPL?period=annual&concepts=R
         ]
       }
     ],
-    "balance": [],
-    "cashflow": [],
-    "per_share": []
+    "balance": [...],
+    "cashflow": [...],
+    "per_share": [...]
   }
 }
 ```
@@ -206,13 +234,13 @@ curl "https://finapi2026.vercel.app/api/financials/AAPL?period=annual&concepts=R
 ```http
 GET /api/concepts
 ```
-Returns all 82 concepts grouped by statement, along with the source XBRL tags mapped to each.
+Returns all 91 concepts grouped by statement, along with the source XBRL tags mapped to each.
 
 ### 3. Service Health
 ```http
 GET /api/health
 ```
-Returns database connectivity status and total number of distinct companies cached in Turso.
+Returns database connectivity status, total companies cached, total historical fact rows in Turso, and a breakdown per company.
 
 ### 4. Background Refresh Trigger (Cron)
 ```http
@@ -227,8 +255,8 @@ Scans the top-N most requested stocks and refreshes any ticker exceeding the 60-
 
 ### JavaScript / TypeScript
 ```typescript
-async function getStockRevenue(ticker: string) {
-  const res = await fetch(`https://finapi2026.vercel.app/api/financials/${ticker}?period=annual&concepts=Revenues&from=2022&wait=true`);
+async function getStockMetrics(ticker: string) {
+  const res = await fetch(`https://finapi2026.vercel.app/api/financials/${ticker}?period=annual&from=2023&wait=true`);
   
   if (res.status === 202) {
     console.log("Ingesting from SEC EDGAR, try again in 5 seconds.");
@@ -236,14 +264,19 @@ async function getStockRevenue(ticker: string) {
   }
   
   const data = await res.json();
-  const revSeries = data.financials.income.find((c: any) => c.concept === "Revenues");
+  console.log(`=== ${data.company.name} (${data.ticker}) ===`);
   
-  revSeries?.periods.forEach((p: any) => {
-    console.log(`${p.end}: $${(p.value / 1e9).toFixed(2)}B`);
+  data.metrics.forEach((m: any) => {
+    const latest = m.periods[m.periods.length - 1];
+    if (m.unit === "ratio") {
+      console.log(`${m.metric}: ${(latest.value * 100).toFixed(1)}%`);
+    } else {
+      console.log(`${m.metric}: $${(latest.value / 1e9).toFixed(2)}B`);
+    }
   });
 }
 
-getStockRevenue("MSFT");
+getStockMetrics("AAPL");
 ```
 
 ### Python
@@ -254,20 +287,22 @@ def get_financials(ticker: str):
     url = f"https://finapi2026.vercel.app/api/financials/{ticker}"
     params = {
         "period": "annual",
-        "concepts": "Revenues,NetIncomeLoss",
-        "from": 2022,
+        "from": 2023,
         "wait": "true"
     }
     response = requests.get(url, params=params)
     data = response.json()
     
-    print(f"Company: {data['company']['name']}")
-    for item in data['financials']['income']:
-        print(f"\n{item['concept']} ({item['unit']}):")
-        for period in item['periods']:
-            print(f"  {period['end']}: {period['value']:,}")
+    print(f"Company: {data['company']['name']} ({data['ticker']})")
+    print("\n--- Key Ratios & Metrics ---")
+    for m in data.get("metrics", []):
+        latest = m["periods"][-1]
+        if m["unit"] == "ratio":
+            print(f"  {m['metric']}: {latest['value'] * 100:.1f}%")
+        else:
+            print(f"  {m['metric']}: ${latest['value'] / 1e9:.2f}B")
 
-get_financials("AAPL")
+get_financials("MSFT")
 ```
 
 ---
