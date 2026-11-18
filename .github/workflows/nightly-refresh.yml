@@ -16,11 +16,15 @@ jobs:
     steps:
       - name: Call /api/cron/refresh
         env:
-          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          API_BASE_URL: ${{ secrets.API_BASE_URL || vars.API_BASE_URL || 'https://finapi2026.vercel.app' }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           LIMIT: ${{ github.event.inputs.limit || '50' }}
         run: |
           set -euo pipefail
+          if [ -z "${CRON_SECRET}" ]; then
+            echo "::error::CRON_SECRET is not set. Add it under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
           curl --fail-with-body -sS --max-time 320 \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             "${API_BASE_URL%/}/api/cron/refresh?limit=${LIMIT}" | tee result.json
